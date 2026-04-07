@@ -43,4 +43,10 @@ public class ExpenseController {
             throw new RuntimeException("Erro ao processar e salvar o gasto");
         }
     }
+
+    @GetMapping
+    public java.util.List<com.brunomarques.meudinheiro.model.Expense> getAllExpenses() {
+        // O findAll() vai no banco H2 e traz todos os registros criados!
+        return expenseRepository.findAll();
+    }
 }
