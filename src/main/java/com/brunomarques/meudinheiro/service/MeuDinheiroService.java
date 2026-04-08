@@ -12,6 +12,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.LocalDate;
 
 @Service
 public class MeuDinheiroService {
@@ -63,5 +64,28 @@ public class MeuDinheiroService {
 
         // Convertendo o JSON final para o nosso objeto Java (ExpenseDto)
         return objectMapper.readValue(aiJsonResponse, ExpenseDto.class);
+    }
+
+    public LocalDate calcularFluxoDeCaixa(String dataCompraStr, String tipoPagamento) {
+        int diaFechamento = 21;
+        int diaVencimento = 24;
+
+        // Avisa o Java que a data que vem da IA está no formato BR (ex: 07/04/2026)
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        LocalDate dataCompra = LocalDate.parse(dataCompraStr, formatter);
+
+        // Se for nulo ou não for crédito, sai na mesma hora
+        if (tipoPagamento == null || !tipoPagamento.trim().equalsIgnoreCase("Crédito")) {
+            return dataCompra;
+        }
+
+        // LÓGICA DO CARTÃO DE CRÉDITO
+        int diaDaCompra = dataCompra.getDayOfMonth();
+
+        if (diaDaCompra <= diaFechamento) {
+            return dataCompra.withDayOfMonth(diaVencimento); // Paga no dia 24 do mesmo mês
+        } else {
+            return dataCompra.plusMonths(1).withDayOfMonth(diaVencimento); // Paga no dia 24 do próximo mês
+        }
     }
 }

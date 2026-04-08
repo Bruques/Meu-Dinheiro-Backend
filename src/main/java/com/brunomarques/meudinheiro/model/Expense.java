@@ -1,7 +1,7 @@
-package com.brunomarques.meudinheiro.model; // Ajuste para o seu pacote
-
+package com.brunomarques.meudinheiro.model;
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDate;
 
 @Entity
 @Data
@@ -17,4 +17,6 @@ public class Expense {
     @Column(name = "expense_date")
     private String date;
     private String paymentType;
+    @Column(name = "data_cobranca")
+    private LocalDate dataCobranca;
 }
