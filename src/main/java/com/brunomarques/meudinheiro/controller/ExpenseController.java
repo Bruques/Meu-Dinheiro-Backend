@@ -7,6 +7,7 @@ import com.brunomarques.meudinheiro.service.MeuDinheiroService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -53,6 +54,11 @@ public class ExpenseController {
     public java.util.List<com.brunomarques.meudinheiro.model.Expense> getAllExpenses() {
         // O findAll() vai no banco H2 e traz todos os registros criados!
         return expenseRepository.findAll();
+    }
+
+    @GetMapping("/mes")
+    public List<Expense> getExpensesByMonth(@RequestParam int mes, @RequestParam int ano) {
+        return expenseRepository.findByMesEAno(mes, ano);
     }
 
     // Rota para deletar um gasto pelo ID

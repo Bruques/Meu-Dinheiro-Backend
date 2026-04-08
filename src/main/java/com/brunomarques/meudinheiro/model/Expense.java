@@ -15,7 +15,7 @@ public class Expense {
     private Double value;
     private String category;
     @Column(name = "expense_date")
-    private String date;
+    private LocalDate date;
     private String paymentType;
     @Column(name = "data_cobranca")
     private LocalDate dataCobranca;

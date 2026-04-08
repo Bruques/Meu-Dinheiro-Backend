@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -23,18 +24,40 @@ public class MeuDinheiroService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public ExpenseDto processExpenseText(String text) throws Exception {
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+    public MeuDinheiroService() {
+        this.objectMapper.registerModule(new JavaTimeModule());
+    }
 
-        // Passamos a data atual para a IA usar como referência caso o usuário diga "hoje" ou "ontem"
-        String dataHoje = LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+    public ExpenseDto processExpenseText(String text) throws Exception {
+        // Mudar para o 2.5 quando puder, levemente mais barato
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=" + apiKey;
+
+        String dataHoje = LocalDate.now().toString();
+        int anoAtual = LocalDate.now().getYear();
 
         // Prompt Engineering rigoroso
-        String prompt = "Você é um assistente financeiro. Extraia os dados do gasto a partir do texto abaixo. " +
-                "Retorne APENAS um objeto JSON estrito, sem formatação markdown (não use ```json). " +
-                "O JSON deve ter as chaves exatas: 'name' (string curta), 'value' (apenas números/decimais), " +
-                "'category' (string curta com a melhor categoria), 'date' (formato dd/MM/yyyy. Use " + dataHoje + " se não especificado), " +
-                "e 'paymentType' (string curta com o método de pagamento, ex: 'crédito', 'débito', 'pix', 'cartão de benefício'. ATENÇÃO: se o método de pagamento NÃO for mencionado no texto, o valor de 'paymentType' DEVE ser explicitamente null, sem aspas). " +
+        String prompt = "Você é um extrator de dados financeiros de altíssima precisão. " +
+                "Sua única função é analisar o texto do usuário e retornar EXATAMENTE UM objeto JSON válido. " +
+                "É ESTRITAMENTE PROIBIDO usar formatação Markdown (NÃO use ```json ou ```). Retorne apenas as chaves e valores. " +
+                "--- " +
+                "CONTEXTO TEMPORAL (INEXORÁVEL): " +
+                "- O dia de HOJE é " + dataHoje + ". " +
+                "- O ano atual é " + anoAtual + ". " +
+                "--- " +
+                "REGRAS DO JSON E TIPOS DE DADOS: " +
+                "1. name: Nome curto e descritivo da despesa (String). " +
+                "2. value: Apenas o valor numérico, usando ponto para decimais, sem a moeda (Number). " +
+                "3. category: A categoria mais adequada, ex: Alimentação, Transporte (String). " +
+                "4. date: Data no formato exato yyyy-MM-dd (String). " +
+                "   - Se o usuário disser hoje ou NÃO mencionar tempo, use OBRIGATORIAMENTE " + dataHoje + ". " +
+                "   - Se o texto citar dia e mês, mas omitir o ano, use OBRIGATORIAMENTE o ano " + anoAtual + ". " +
+                "5. paymentType: Padronize para Crédito, Débito, Pix ou Cartão Benefício (String ou null). " +
+                "   - Se não for mencionado, retorne o valor null nativo do JSON. " +
+                "--- " +
+                "ESTRUTURA ESPERADA (sem usar aspas na explicação, mas use no JSON real): " +
+                "{ name: exemplo, value: 0.00, category: exemplo, date: yyyy-MM-dd, paymentType: null } " +
+                "--- " +
                 "Texto do usuário: " + text;
 
         // Montando o corpo da requisição no formato que o Gemini exige
@@ -66,13 +89,9 @@ public class MeuDinheiroService {
         return objectMapper.readValue(aiJsonResponse, ExpenseDto.class);
     }
 
-    public LocalDate calcularFluxoDeCaixa(String dataCompraStr, String tipoPagamento) {
+    public LocalDate calcularFluxoDeCaixa(LocalDate dataCompra, String tipoPagamento) {
         int diaFechamento = 21;
         int diaVencimento = 24;
-
-        // Avisa o Java que a data que vem da IA está no formato BR (ex: 07/04/2026)
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-        LocalDate dataCompra = LocalDate.parse(dataCompraStr, formatter);
 
         // Se for nulo ou não for crédito, sai na mesma hora
         if (tipoPagamento == null || !tipoPagamento.trim().equalsIgnoreCase("Crédito")) {
@@ -83,9 +102,9 @@ public class MeuDinheiroService {
         int diaDaCompra = dataCompra.getDayOfMonth();
 
         if (diaDaCompra <= diaFechamento) {
-            return dataCompra.withDayOfMonth(diaVencimento); // Paga no dia 24 do mesmo mês
+            return dataCompra.withDayOfMonth(diaVencimento);
         } else {
-            return dataCompra.plusMonths(1).withDayOfMonth(diaVencimento); // Paga no dia 24 do próximo mês
+            return dataCompra.plusMonths(1).withDayOfMonth(diaVencimento);
         }
     }
 }
