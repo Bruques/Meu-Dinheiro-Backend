@@ -19,4 +19,6 @@ public class Expense {
     private String paymentType;
     @Column(name = "data_cobranca")
     private LocalDate dataCobranca;
+    @Column(name = "user_id")
+    private String userId;
 }

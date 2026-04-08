@@ -12,7 +12,14 @@ import java.util.List;
 public interface MeuDinheiroRepository extends JpaRepository<Expense, Long> {
     // Só de herdar o JpaRepository, você ganha métodos como save(), findAll(), deleteById() de graça!
 
-    // Busca os gastos onde o mês e o ano da DATA DE COBRANÇA sejam iguais aos que passarmos
-    @Query("SELECT e FROM Expense e WHERE MONTH(e.dataCobranca) = :mes AND YEAR(e.dataCobranca) = :ano")
-    List<Expense> findByMesEAno(@Param("mes") int mes, @Param("ano") int ano);
+    // Agora a query exige o userId além do mês e ano
+    @Query("SELECT e FROM Expense e WHERE e.userId = :userId AND MONTH(e.dataCobranca) = :mes AND YEAR(e.dataCobranca) = :ano")
+    List<Expense> findByMesEAno(
+            @Param("userId") String userId,
+            @Param("mes") int mes,
+            @Param("ano") int ano
+    );
+
+    // Opcional: Se quiser listar tudo de um usuário sem filtro de data
+    List<Expense> findByUserId(String userId);
 }
