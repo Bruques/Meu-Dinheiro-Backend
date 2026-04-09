@@ -9,6 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -23,31 +24,38 @@ public class ExpenseController {
     private MeuDinheiroRepository expenseRepository;
 
     @PostMapping("/extract")
-    public Expense extractAndSaveExpense(@RequestBody Map<String, String> payload, @AuthenticationPrincipal Jwt jwt) {
+    public List<Expense> extractAndSaveExpense(@RequestBody Map<String, String> payload, @AuthenticationPrincipal Jwt jwt) {
         try {
             String userText = payload.get("text");
-            String userId = jwt.getSubject(); // Pega o ID do dono do token
+            String userId = jwt.getSubject();
 
-            ExpenseDto dto = aiExpenseService.processExpenseText(userText);
+            // Agora recebe uma lista de DTOs do Gemini
+            List<ExpenseDto> dtos = aiExpenseService.processExpenseText(userText);
 
-            Expense newExpense = new Expense();
-            newExpense.setName(dto.name());
-            newExpense.setValue(dto.value());
-            newExpense.setCategory(dto.category());
-            newExpense.setPaymentType(dto.paymentType());
-            newExpense.setDate(dto.date());
+            List<Expense> despesasParaSalvar = new ArrayList<>();
 
-            // Define o dono do gasto!
-            newExpense.setUserId(userId);
+            // Faz um loop criando uma Entidade para cada DTO encontrado
+            for (ExpenseDto dto : dtos) {
+                Expense newExpense = new Expense();
+                newExpense.setName(dto.name());
+                newExpense.setValue(dto.value());
+                newExpense.setCategory(dto.category());
+                newExpense.setPaymentType(dto.paymentType());
+                newExpense.setDate(dto.date());
+                newExpense.setUserId(userId);
 
-            java.time.LocalDate cobranca = aiExpenseService.calcularFluxoDeCaixa(dto.date(), dto.paymentType());
-            newExpense.setDataCobranca(cobranca);
+                java.time.LocalDate cobranca = aiExpenseService.calcularFluxoDeCaixa(dto.date(), dto.paymentType());
+                newExpense.setDataCobranca(cobranca);
 
-            return expenseRepository.save(newExpense);
+                despesasParaSalvar.add(newExpense);
+            }
+
+            // Salva todos de uma vez no banco (muito mais rápido!) e retorna a lista
+            return expenseRepository.saveAll(despesasParaSalvar);
 
         } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Erro ao processar e salvar o gasto");
+            throw new RuntimeException("Erro ao processar e salvar os gastos em lote");
         }
     }
 

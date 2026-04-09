@@ -10,10 +10,12 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class MeuDinheiroService {
@@ -29,64 +31,50 @@ public class MeuDinheiroService {
     }
 
 
-    public ExpenseDto processExpenseText(String text) throws Exception {
-        // Mudar para o 2.5 quando puder, levemente mais barato
+    public List<ExpenseDto> processExpenseText(String text) throws Exception {
         String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=" + apiKey;
 
         String dataHoje = LocalDate.now().toString();
         int anoAtual = LocalDate.now().getYear();
 
-        // Prompt Engineering rigoroso
-        String prompt = "Você é um extrator de dados financeiros de altíssima precisão. " +
-                "Sua única função é analisar o texto do usuário e retornar EXATAMENTE UM objeto JSON válido. " +
-                "É ESTRITAMENTE PROIBIDO usar formatação Markdown (NÃO use ```json ou ```). Retorne apenas as chaves e valores. " +
-                "--- " +
-                "CONTEXTO TEMPORAL (INEXORÁVEL): " +
-                "- O dia de HOJE é " + dataHoje + ". " +
-                "- O ano atual é " + anoAtual + ". " +
-                "--- " +
-                "REGRAS DO JSON E TIPOS DE DADOS: " +
-                "1. name: Nome curto e descritivo da despesa (String). " +
-                "2. value: Apenas o valor numérico, usando ponto para decimais, sem a moeda (Number). " +
-                "3. category: A categoria mais adequada, ex: Alimentação, Transporte (String). " +
-                "4. date: Data no formato exato yyyy-MM-dd (String). " +
-                "   - Se o usuário disser hoje ou NÃO mencionar tempo, use OBRIGATORIAMENTE " + dataHoje + ". " +
-                "   - Se o texto citar dia e mês, mas omitir o ano, use OBRIGATORIAMENTE o ano " + anoAtual + ". " +
-                "5. paymentType: Padronize para Crédito, Débito, Pix ou Cartão Benefício (String ou null). " +
-                "   - Se não for mencionado, retorne o valor null nativo do JSON. " +
-                "--- " +
-                "ESTRUTURA ESPERADA (sem usar aspas na explicação, mas use no JSON real): " +
-                "{ name: exemplo, value: 0.00, category: exemplo, date: yyyy-MM-dd, paymentType: null } " +
-                "--- " +
-                "Texto do usuário: " + text;
+        // 1. PROMPT ATUALIZADO: Pedindo um Array
+        String prompt = "Extraia os dados financeiros da frase abaixo. " +
+                "Retorne SEMPRE um ARRAY de objetos JSON (lista). " +
+                "Se houver apenas um gasto, retorne um array com um único objeto. " +
+                "Se houver múltiplos gastos, separe-os em objetos distintos dentro do array. " +
+                "O dia de HOJE é " + dataHoje + " e o ano é " + anoAtual + ". " +
+                "Regras para cada objeto: " +
+                "name: Nome curto da despesa. " +
+                "value: Apenas número (ex: 50.00). " +
+                "category: Categoria. " +
+                "date: Data yyyy-MM-dd. " +
+                "paymentType: Crédito, Débito, Pix, Cartão Benefício ou null. " +
+                "Frase: " + text;
 
-        // Montando o corpo da requisição no formato que o Gemini exige
         String requestBody = """
-                {
-                  "contents": [{
-                    "parts":[{"text": "%s"}]
-                  }]
-                }
-                """.formatted(prompt);
+            {
+              "contents": [{
+                "parts":[{"text": "%s"}]
+              }],
+              "generationConfig": {
+                "response_mime_type": "application/json"
+              }
+            }
+            """.formatted(prompt);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
 
-        // Fazendo a chamada HTTP
         String responseBody = restTemplate.postForObject(url, request, String.class);
 
-        // Navegando no JSON de resposta do Gemini para pegar o texto gerado
         JsonNode rootNode = objectMapper.readTree(responseBody);
         String aiJsonResponse = rootNode.path("candidates").get(0)
                 .path("content").path("parts").get(0)
                 .path("text").asText();
 
-        // Limpando qualquer possível formatação extra que a IA mande por engano
-        aiJsonResponse = aiJsonResponse.replace("```json", "").replace("```", "").trim();
-
-        // Convertendo o JSON final para o nosso objeto Java (ExpenseDto)
-        return objectMapper.readValue(aiJsonResponse, ExpenseDto.class);
+        // 2. LENDO A LISTA: Agora o Jackson vai converter o JSON direto para um List<ExpenseDto>
+        return objectMapper.readValue(aiJsonResponse, new TypeReference<List<ExpenseDto>>() {});
     }
 
     public LocalDate calcularFluxoDeCaixa(LocalDate dataCompra, String tipoPagamento) {
