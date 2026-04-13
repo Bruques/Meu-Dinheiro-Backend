@@ -1,5 +1,9 @@
 package com.brunomarques.meudinheiro.controller;
 
+import com.brunomarques.meudinheiro.dto.ExpenseDto;
+import com.brunomarques.meudinheiro.model.Expense;
+import com.brunomarques.meudinheiro.repository.MeuDinheiroRepository;
+import com.brunomarques.meudinheiro.service.MeuDinheiroService;
 import com.brunomarques.meudinheiro.service.WhatsappService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -7,18 +11,27 @@ import org.springframework.web.bind.annotation.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/whatsapp")
 public class WhatsappController {
     private final WhatsappService whatsAppService;
+    private final MeuDinheiroService meuDinheiroService;
+    private final MeuDinheiroRepository meuDinheiroRepository;
 
     // Invente uma senha forte aqui. Você vai precisar dela no painel da Meta.
     private final String VERIFY_TOKEN = "meu_token_secreto_123";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public WhatsappController(WhatsappService whatsAppService) {
+    public WhatsappController(WhatsappService whatsAppService,
+                              MeuDinheiroService meuDinheiroService,
+                              MeuDinheiroRepository meuDinheiroRepository) {
         this.whatsAppService = whatsAppService;
+        this.meuDinheiroService = meuDinheiroService;
+        this.meuDinheiroRepository = meuDinheiroRepository;
     }
 
     @GetMapping("/webhook")
@@ -61,12 +74,50 @@ public class WhatsappController {
                     if ("text".equals(tipoMensagem)) {
                         String textoDoCliente = messageNode.path("text").path("body").asText();
 
-                        System.out.println("📱 Nova mensagem de: " + numeroCliente);
+                        System.out.println("📱 Mensagem de: " + numeroCliente);
                         System.out.println("💬 Texto: " + textoDoCliente);
 
-                        // FAZENDO O ROBÔ RESPONDER NA HORA!
-                        String resposta = "Olá, Bruno! Eu recebi a sua mensagem: '" + textoDoCliente + "'. Em breve vou transformar isso em um gasto no banco!";
-                        whatsAppService.enviarMensagem(numeroCliente, resposta);
+                        try {
+                            // 1. Manda a frase do Zap pro Gemini processar
+                            List<ExpenseDto> dtos = meuDinheiroService.processExpenseText(textoDoCliente);
+
+                            List<Expense> despesasParaSalvar = new ArrayList<>();
+
+                            // 2. Começa a montar a resposta (O Recibo do WhatsApp)
+                            StringBuilder mensagemResposta = new StringBuilder("✅ *Gasto Registrado!*\n\n");
+
+                            // 3. Transforma o que a IA entendeu em dados pro Banco
+                            for (ExpenseDto dto : dtos) {
+                                Expense newExpense = new Expense();
+                                newExpense.setName(dto.name());
+                                newExpense.setValue(dto.value());
+                                newExpense.setCategory(dto.category());
+                                newExpense.setPaymentType(dto.paymentType());
+                                newExpense.setDate(dto.date());
+
+                                // AQUI É O SEGREDO DO MVP: O número do Zap vira o ID do usuário
+                                newExpense.setUserId(numeroCliente);
+
+                                despesasParaSalvar.add(newExpense);
+
+                                // Adiciona o item formatado no "recibo"
+                                mensagemResposta.append("🛒 *Item:* ").append(dto.name()).append("\n")
+                                        .append("💰 *Valor:* R$ ").append(dto.value()).append("\n")
+                                        .append("🏷️ *Categoria:* ").append(dto.category()).append("\n")
+                                        .append("💳 *Pagamento:* ").append(dto.paymentType()).append("\n\n");
+                            }
+
+                            // 4. Salva tudo de uma vez no Banco de Dados
+                            meuDinheiroRepository.saveAll(despesasParaSalvar);
+
+                            // 5. Manda a mensagem bonitinha de volta pro usuário
+                            whatsAppService.enviarMensagem(numeroCliente, mensagemResposta.toString());
+
+                        } catch (Exception e) {
+                            System.err.println("❌ Erro na IA: " + e.getMessage());
+                            // Se a IA não entender, ou der erro, avisa o usuário com educação
+                            whatsAppService.enviarMensagem(numeroCliente, "Ops! 😅 Tive um problema para entender esse gasto. Pode tentar falar de outra forma?");
+                        }
                     }
                 }
             }
