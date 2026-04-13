@@ -18,15 +18,19 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Libera a comunicação com o Angular (localhost:4200)
+                // 1. Libera a comunicação com o Angular
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // 2. Desativa proteção CSRF (não é necessária para APIs com JWT)
+                // 2. Desativa proteção CSRF
                 .csrf(csrf -> csrf.disable())
-                // 3. Exige autenticação para qualquer requisição
+                // 3. CONFIGURAÇÃO DE REGRAS DE ACESSO
                 .authorizeHttpRequests(auth -> auth
+                        // LIBERAÇÃO WHATSAPP: Permite que a Meta acesse o webhook sem token
+                        .requestMatchers("/api/whatsapp/**").permitAll()
+
+                        // O RESTO CONTINUA BLOQUEADO: Exige autenticação para todo o resto
                         .anyRequest().authenticated()
                 )
-                // 4. Ensina o Spring a ler o Token JWT do Firebase
+                // 4. Configuração do JWT
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));
 
         return http.build();
