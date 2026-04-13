@@ -1,5 +1,6 @@
 package com.brunomarques.meudinheiro.controller;
 
+import com.brunomarques.meudinheiro.service.WhatsappService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -9,11 +10,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @RestController
 @RequestMapping("/api/whatsapp")
 public class WhatsappController {
+    private final WhatsappService whatsAppService;
 
     // Invente uma senha forte aqui. Você vai precisar dela no painel da Meta.
     private final String VERIFY_TOKEN = "meu_token_secreto_123";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public WhatsappController(WhatsappService whatsAppService) {
+        this.whatsAppService = whatsAppService;
+    }
 
     @GetMapping("/webhook")
     public ResponseEntity<String> verifyWebhook(
@@ -58,10 +64,9 @@ public class WhatsappController {
                         System.out.println("📱 Nova mensagem de: " + numeroCliente);
                         System.out.println("💬 Texto: " + textoDoCliente);
 
-                        // TODO: Passo 4 - Chamar a IA e salvar no banco!
-                        // List<ExpenseDto> dtos = aiExpenseService.processExpenseText(textoDoCliente);
-                        // salvarNoBanco(dtos);
-                        // enviarMensagemDeConfirmacao(numeroCliente, "Gasto salvo!");
+                        // FAZENDO O ROBÔ RESPONDER NA HORA!
+                        String resposta = "Olá, Bruno! Eu recebi a sua mensagem: '" + textoDoCliente + "'. Em breve vou transformar isso em um gasto no banco!";
+                        whatsAppService.enviarMensagem(numeroCliente, resposta);
                     }
                 }
             }
