@@ -36,6 +36,18 @@ public class WhatsappService {
                 }
                 """.formatted(numeroDestino, texto);
 
+        // --- CÓDIGO DE DEBUG (RAIO-X) ---
+        System.out.println("🔍 INICIANDO ENVIO PARA A META...");
+        System.out.println("📱 Phone ID configurado: " + phoneId);
+
+        if (token == null || token.isBlank()) {
+            System.out.println("❌ ERRO CRÍTICO: O Token está VAZIO ou NULO no Railway!");
+        } else {
+            System.out.println("🔑 Token lido com sucesso. Começa com: " + token.substring(0, Math.min(token.length(), 15)) + "...");
+            System.out.println("📏 Tamanho total do token: " + token.length() + " caracteres.");
+        }
+        // --------------------------------
+
         // Configurando os cabeçalhos com o Token de Segurança
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
