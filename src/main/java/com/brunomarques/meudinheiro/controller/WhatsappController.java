@@ -123,26 +123,52 @@ public class WhatsappController {
                     if ("audio".equals(tipoMensagem)) {
                         System.out.println("🎤 Mensagem de ÁUDIO recebida de: " + numeroCliente);
 
-                        // 1. Pega o ID do Áudio no JSON
+                        // 1. Pega o ID e busca a URL
                         String mediaId = messageNode.path("audio").path("id").asText();
-
                         whatsAppService.enviarMensagem(numeroCliente, "🎧 Estou ouvindo seu áudio, só um segundo...");
 
-                        // 2. Pede pro Serviço descobrir o Link
                         String urlDeDownload = whatsAppService.obterUrlDaMidia(mediaId);
 
                         if (urlDeDownload != null) {
-                            // 3. Baixa os bytes do arquivo!
                             byte[] audioBytes = whatsAppService.baixarArquivo(urlDeDownload);
 
-                            // TESTE DO MVP DE ÁUDIO:
-                            // Vamos ver se o download funcionou antes de plugar na IA
                             if (audioBytes != null) {
-                                whatsAppService.enviarMensagem(numeroCliente, "✅ Áudio baixado no meu servidor! Tem " + audioBytes.length + " bytes de tamanho.");
+                                try {
+                                    // --- AQUI A MÁGICA ACONTECE ---
+                                    // 2. Manda os bytes para o Gemini processar
+                                    List<ExpenseDto> dtos = meuDinheiroService.processExpenseAudio(audioBytes);
 
-                                // TODO: O próximo passo será mandar esses bytes pro Gemini!
+                                    List<Expense> despesasParaSalvar = new ArrayList<>();
+                                    StringBuilder mensagemResposta = new StringBuilder("✅ *Áudio Processado com Sucesso!*\n\n");
+
+                                    // 3. Organiza os dados para o banco e para o recibo
+                                    for (ExpenseDto dto : dtos) {
+                                        Expense newExpense = new Expense();
+                                        newExpense.setName(dto.name());
+                                        newExpense.setValue(dto.value());
+                                        newExpense.setCategory(dto.category());
+                                        newExpense.setPaymentType(dto.paymentType());
+                                        newExpense.setDate(dto.date());
+                                        newExpense.setUserId(numeroCliente);
+
+                                        despesasParaSalvar.add(newExpense);
+
+                                        mensagemResposta.append("🛒 *Item:* ").append(dto.name()).append("\n")
+                                                .append("💰 *Valor:* R$ ").append(dto.value()).append("\n")
+                                                .append("🏷️ *Categoria:* ").append(dto.category()).append("\n")
+                                                .append("💳 *Pagamento:* ").append(dto.paymentType()).append("\n\n");
+                                    }
+
+                                    // 4. Salva no banco e responde o usuário
+                                    meuDinheiroRepository.saveAll(despesasParaSalvar);
+                                    whatsAppService.enviarMensagem(numeroCliente, mensagemResposta.toString());
+
+                                } catch (Exception e) {
+                                    System.err.println("❌ Erro ao processar IA do Áudio: " + e.getMessage());
+                                    whatsAppService.enviarMensagem(numeroCliente, "⚠️ Consegui ouvir, mas não entendi os valores. Pode repetir de forma mais clara?");
+                                }
                             } else {
-                                whatsAppService.enviarMensagem(numeroCliente, "❌ Falha ao processar o arquivo de áudio.");
+                                whatsAppService.enviarMensagem(numeroCliente, "❌ Erro ao baixar o arquivo de áudio.");
                             }
                         }
                     }
