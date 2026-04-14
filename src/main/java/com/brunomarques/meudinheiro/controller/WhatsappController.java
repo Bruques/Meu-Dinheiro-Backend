@@ -119,6 +119,33 @@ public class WhatsappController {
                             whatsAppService.enviarMensagem(numeroCliente, "Ops! 😅 Tive um problema para entender esse gasto. Pode tentar falar de outra forma?");
                         }
                     }
+
+                    if ("audio".equals(tipoMensagem)) {
+                        System.out.println("🎤 Mensagem de ÁUDIO recebida de: " + numeroCliente);
+
+                        // 1. Pega o ID do Áudio no JSON
+                        String mediaId = messageNode.path("audio").path("id").asText();
+
+                        whatsAppService.enviarMensagem(numeroCliente, "🎧 Estou ouvindo seu áudio, só um segundo...");
+
+                        // 2. Pede pro Serviço descobrir o Link
+                        String urlDeDownload = whatsAppService.obterUrlDaMidia(mediaId);
+
+                        if (urlDeDownload != null) {
+                            // 3. Baixa os bytes do arquivo!
+                            byte[] audioBytes = whatsAppService.baixarArquivo(urlDeDownload);
+
+                            // TESTE DO MVP DE ÁUDIO:
+                            // Vamos ver se o download funcionou antes de plugar na IA
+                            if (audioBytes != null) {
+                                whatsAppService.enviarMensagem(numeroCliente, "✅ Áudio baixado no meu servidor! Tem " + audioBytes.length + " bytes de tamanho.");
+
+                                // TODO: O próximo passo será mandar esses bytes pro Gemini!
+                            } else {
+                                whatsAppService.enviarMensagem(numeroCliente, "❌ Falha ao processar o arquivo de áudio.");
+                            }
+                        }
+                    }
                 }
             }
 
