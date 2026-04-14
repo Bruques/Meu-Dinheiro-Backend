@@ -9,6 +9,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class WhatsappService {
@@ -20,6 +21,7 @@ public class WhatsappService {
     private String token;
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void enviarMensagem(String numeroDestino, String texto) {
         String url = "https://graph.facebook.com/v20.0/" + phoneId + "/messages";
@@ -59,14 +61,21 @@ public class WhatsappService {
         String url = "https://graph.facebook.com/v20.0/" + mediaId;
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(token); // Sem o token, a Meta não diz o link
+        headers.setBearerAuth(token);
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<JsonNode> response = restTemplate.exchange(url, HttpMethod.GET, entity, JsonNode.class);
-            return response.getBody().path("url").asText();
+            // Mudamos de JsonNode.class para String.class para evitar o erro de definição de tipo
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+            // Agora usamos o objectMapper para navegar no texto do JSON manualmente
+            JsonNode root = objectMapper.readTree(response.getBody());
+            String urlDownload = root.path("url").asText();
+
+            System.out.println("🔗 URL de download encontrada: " + urlDownload);
+            return urlDownload;
         } catch (Exception e) {
-            System.err.println("❌ Erro ao buscar URL da mídia: " + e.getMessage());
+            System.err.println("❌ Erro ao processar JSON da mídia: " + e.getMessage());
             return null;
         }
     }
