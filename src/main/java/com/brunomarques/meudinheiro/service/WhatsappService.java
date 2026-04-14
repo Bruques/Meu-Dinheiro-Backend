@@ -19,46 +19,33 @@ public class WhatsappService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     public void enviarMensagem(String numeroDestino, String texto) {
-        // Usamos a versão v20.0 da Graph API (padrão atual de produção)
         String url = "https://graph.facebook.com/v20.0/" + phoneId + "/messages";
 
-        // Montando o JSON no formato exato que a Meta exige
-        String requestBody = """
-                {
-                  "messaging_product": "whatsapp",
-                  "recipient_type": "individual",
-                  "to": "%s",
-                  "type": "text",
-                  "text": {
-                    "preview_url": false,
-                    "body": "%s"
-                  }
-                }
-                """.formatted(numeroDestino, texto);
+        // 1. Criamos o corpo usando um Map ou String bem limpa
+        // Certifique-se de que não há espaços extras ou quebras de linha estranhas
+        String jsonPayload = """
+            {
+              "messaging_product": "whatsapp",
+              "recipient_type": "individual",
+              "to": "%s",
+              "type": "text",
+              "text": { "body": "%s" }
+            }
+            """.formatted(numeroDestino, texto.replace("\n", "\\n")); // Escapa quebras de linha
 
-        // --- CÓDIGO DE DEBUG (RAIO-X) ---
-        System.out.println("🔍 INICIANDO ENVIO PARA A META...");
-        System.out.println("📱 Phone ID configurado: " + phoneId);
-
-        if (token == null || token.isBlank()) {
-            System.out.println("❌ ERRO CRÍTICO: O Token está VAZIO ou NULO no Railway!");
-        } else {
-            System.out.println("🔑 Token lido com sucesso. Começa com: " + token.substring(0, Math.min(token.length(), 15)) + "...");
-            System.out.println("📏 Tamanho total do token: " + token.length() + " caracteres.");
-        }
-        // --------------------------------
-
-        // Configurando os cabeçalhos com o Token de Segurança
+        // 2. Cabeçalhos explícitos
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(token); // Isso adiciona o "Authorization: Bearer SEU_TOKEN"
+        headers.setBearerAuth(token);
 
-        HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
+        HttpEntity<String> entity = new HttpEntity<>(jsonPayload, headers);
 
         try {
-            // Dispara a mensagem para o WhatsApp!
-            restTemplate.postForObject(url, request, String.class);
-            System.out.println("✅ Mensagem enviada com sucesso para: " + numeroDestino);
+            // Log de depuração para ver o que REALMENTE está saindo
+            System.out.println("🚀 Enviando JSON para Meta: " + jsonPayload);
+
+            restTemplate.postForObject(url, entity, String.class);
+            System.out.println("✅ Mensagem entregue ao WhatsApp!");
         } catch (Exception e) {
             System.err.println("❌ Erro ao enviar mensagem: " + e.getMessage());
         }
