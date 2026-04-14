@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.core.type.TypeReference;
+import java.util.Base64;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -94,5 +95,58 @@ public class MeuDinheiroService {
         } else {
             return dataCompra.plusMonths(1).withDayOfMonth(diaVencimento);
         }
+    }
+
+    public List<ExpenseDto> processExpenseAudio(byte[] audioBytes) throws Exception {
+        // 1. Transforma o áudio em Texto (Base64)
+        String base64Audio = Base64.getEncoder().encodeToString(audioBytes);
+        String geminiApiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=" + apiKey;
+
+        // O mesmo prompt poderoso que você já usa, mas avisando que é um áudio
+        String prompt = "Extraia os dados financeiros do áudio em anexo. Retorne SEMPRE um ARRAY de objetos JSON (lista). Se houver apenas um gasto, retorne um array com um único objeto. O dia de HOJE é 2026-04-13 e o ano é 2026. Regras para cada objeto: name: Nome curto. value: Apenas número (ex: 50.00). category: Categoria. date: Data yyyy-MM-dd. paymentType: Crédito, Débito, Pix ou null.";
+
+        // 2. Monta o JSON especial Multimodal do Gemini
+        String requestBody = """
+                {
+                  "contents": [{
+                    "parts": [
+                      {"text": "%s"},
+                      {
+                        "inline_data": {
+                          "mime_type": "audio/ogg",
+                          "data": "%s"
+                        }
+                      }
+                    ]
+                  }],
+                  "generationConfig": {
+                    "response_mime_type": "application/json"
+                  }
+                }
+                """.formatted(prompt, base64Audio);
+
+        // 3. Dispara para o Gemini (Mesma lógica que você já tem no método de texto)
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
+
+        // OBS: Substitua "SUA_URL_DO_GEMINI_AQUI" pela variável de URL que você já usa na sua classe
+        String response = restTemplate.postForObject(geminiApiUrl, request, String.class);
+
+        // 4. Converte a resposta do Gemini para a sua lista de DTOs
+        return extrairDtosDaResposta(response);
+    }
+
+    private List<ExpenseDto> extrairDtosDaResposta(String response) throws Exception {
+        JsonNode root = objectMapper.readTree(response);
+        String jsonLimpo = root.path("candidates")
+                .get(0)
+                .path("content")
+                .path("parts")
+                .get(0)
+                .path("text")
+                .asText();
+
+        return objectMapper.readValue(jsonLimpo, new TypeReference<List<ExpenseDto>>() {});
     }
 }
