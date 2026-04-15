@@ -132,7 +132,11 @@ public class WhatsappController {
                         newExpense.setPaymentType(dto.paymentType());
                         newExpense.setDate(dto.date());
 
-                        // AQUI ESTÁ A MUDANÇA: Salvando o UID do Firebase em vez do telefone!
+                        // 👉 AQUI ESTÁ A CORREÇÃO DO FLUXO DE CAIXA!
+                        java.time.LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType());
+                        newExpense.setDataCobranca(cobranca);
+
+                        // Salvando o UID do Firebase
                         newExpense.setUserId(firebaseUid);
                         despesasParaSalvar.add(newExpense);
 
@@ -170,7 +174,11 @@ public class WhatsappController {
                                 newExpense.setPaymentType(dto.paymentType());
                                 newExpense.setDate(dto.date());
 
-                                // AQUI ESTÁ A MUDANÇA: Salvando o UID do Firebase em vez do telefone!
+                                // 👉 AQUI ESTÁ A CORREÇÃO DO FLUXO DE CAIXA!
+                                java.time.LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType());
+                                newExpense.setDataCobranca(cobranca);
+
+                                // Salvando o UID do Firebase
                                 newExpense.setUserId(firebaseUid);
                                 despesasParaSalvar.add(newExpense);
 
