@@ -163,7 +163,7 @@ public class WhatsappController {
                     byte[] audioBytes = whatsAppService.baixarArquivo(urlDeDownload);
                     if (audioBytes != null) {
                         try {
-                            List<ExpenseDto> dtos = meuDinheiroService.processExpenseAudio(audioBytes);
+                            List<ExpenseDto> dtos = meuDinheiroService.processExpenseAudio(audioBytes, usuarioLogado.getCustomCategories());
                             List<Expense> despesasParaSalvar = new ArrayList<>();
                             StringBuilder mensagemResposta = new StringBuilder("✅ *Áudio Processado!*\n\n");
 

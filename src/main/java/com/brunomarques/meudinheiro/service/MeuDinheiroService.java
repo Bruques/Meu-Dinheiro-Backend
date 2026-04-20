@@ -100,43 +100,58 @@ public class MeuDinheiroService {
         }
     }
 
-    public List<ExpenseDto> processExpenseAudio(byte[] audioBytes) throws Exception {
+    public List<ExpenseDto> processExpenseAudio(byte[] audioBytes, List<String> categoriasDoUsuario) throws Exception {
         // 1. Transforma o áudio em Texto (Base64)
-        String base64Audio = Base64.getEncoder().encodeToString(audioBytes);
+        String base64Audio = java.util.Base64.getEncoder().encodeToString(audioBytes);
         String geminiApiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=" + apiKey;
 
-        // O mesmo prompt poderoso que você já usa, mas avisando que é um áudio
-        String prompt = "Extraia os dados financeiros do áudio em anexo. Retorne SEMPRE um ARRAY de objetos JSON (lista). Se houver apenas um gasto, retorne um array com um único objeto. O dia de HOJE é 2026-04-13 e o ano é 2026. Regras para cada objeto: name: Nome curto. value: Apenas número (ex: 50.00). category: Categoria. date: Data yyyy-MM-dd. paymentType: Crédito, Débito, Pix ou null.";
+        // Pega a data dinâmica do servidor
+        String dataHoje = java.time.LocalDate.now().toString();
+        int anoAtual = java.time.LocalDate.now().getYear();
 
-        // 2. Monta o JSON especial Multimodal do Gemini
+        // Formata a lista de categorias do usuário ("A, B, C")
+        String categoriasFormatadas = String.join(", ", categoriasDoUsuario);
+
+        // 2. PROMPT ATUALIZADO: Com a trava de categorias inserida
+        String prompt = "Extraia os dados financeiros do áudio em anexo. " +
+                "Retorne SEMPRE um ARRAY de objetos JSON (lista). " +
+                "Se houver apenas um gasto, retorne um array com um único objeto. " +
+                "O dia de HOJE é " + dataHoje + " e o ano é " + anoAtual + ". " +
+                "Regras para cada objeto: " +
+                "name: Nome curto. " +
+                "value: Apenas número (ex: 50.00). " +
+                "category: VOCÊ ESTÁ PROIBIDO de inventar categorias. Classifique o gasto escolhendo EXATAMENTE UMA destas opções: [" + categoriasFormatadas + "]. Se não se encaixar em nenhuma, escolha a mais próxima ou 'Outros'. " +
+                "date: Data yyyy-MM-dd. " +
+                "paymentType: Crédito, Débito, Pix ou null.";
+
+        // 3. Monta o JSON especial Multimodal do Gemini
         String requestBody = """
-                {
-                  "contents": [{
-                    "parts": [
-                      {"text": "%s"},
-                      {
-                        "inline_data": {
-                          "mime_type": "audio/ogg",
-                          "data": "%s"
-                        }
-                      }
-                    ]
-                  }],
-                  "generationConfig": {
-                    "response_mime_type": "application/json"
+            {
+              "contents": [{
+                "parts": [
+                  {"text": "%s"},
+                  {
+                    "inline_data": {
+                      "mime_type": "audio/ogg",
+                      "data": "%s"
+                    }
                   }
-                }
-                """.formatted(prompt, base64Audio);
+                ]
+              }],
+              "generationConfig": {
+                "response_mime_type": "application/json"
+              }
+            }
+            """.formatted(prompt, base64Audio);
 
-        // 3. Dispara para o Gemini (Mesma lógica que você já tem no método de texto)
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
+        // 4. Dispara para o Gemini
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        org.springframework.http.HttpEntity<String> request = new org.springframework.http.HttpEntity<>(requestBody, headers);
 
-        // OBS: Substitua "SUA_URL_DO_GEMINI_AQUI" pela variável de URL que você já usa na sua classe
         String response = restTemplate.postForObject(geminiApiUrl, request, String.class);
 
-        // 4. Converte a resposta do Gemini para a sua lista de DTOs
+        // 5. Converte a resposta do Gemini para a sua lista de DTOs usando o seu método auxiliar
         return extrairDtosDaResposta(response);
     }
 
