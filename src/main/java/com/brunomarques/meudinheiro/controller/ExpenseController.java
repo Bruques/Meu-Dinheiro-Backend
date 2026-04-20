@@ -1,7 +1,9 @@
 package com.brunomarques.meudinheiro.controller;
 
 import com.brunomarques.meudinheiro.dto.ExpenseDto;
+import com.brunomarques.meudinheiro.model.AppUser;
 import com.brunomarques.meudinheiro.model.Expense;
+import com.brunomarques.meudinheiro.repository.AppUserRepository;
 import com.brunomarques.meudinheiro.repository.MeuDinheiroRepository;
 import com.brunomarques.meudinheiro.service.MeuDinheiroService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,14 +25,26 @@ public class ExpenseController {
     @Autowired
     private MeuDinheiroRepository expenseRepository;
 
+    @Autowired
+    private AppUserRepository appUserRepository;
+
     @PostMapping("/extract")
     public List<Expense> extractAndSaveExpense(@RequestBody Map<String, String> payload, @AuthenticationPrincipal Jwt jwt) {
         try {
             String userText = payload.get("text");
             String userId = jwt.getSubject();
 
-            // Agora recebe uma lista de DTOs do Gemini
-            List<ExpenseDto> dtos = aiExpenseService.processExpenseText(userText);
+            // 1. Busca o usuário no banco para pegar as categorias dele
+            AppUser usuarioLogado = appUserRepository.findById(userId).orElse(new AppUser());
+            List<String> categoriasDoUsuario = usuarioLogado.getCustomCategories();
+
+            // Se por acaso a lista vier vazia (segurança extra), manda um padrão na hora
+            if (categoriasDoUsuario == null || categoriasDoUsuario.isEmpty()) {
+                categoriasDoUsuario = List.of("Alimentação", "Transporte", "Moradia", "Saúde", "Lazer", "Outros");
+            }
+
+            // 2. Passa a lista pro Gemini trabalhar engessado
+            List<ExpenseDto> dtos = aiExpenseService.processExpenseText(userText, categoriasDoUsuario);
 
             List<Expense> despesasParaSalvar = new ArrayList<>();
 

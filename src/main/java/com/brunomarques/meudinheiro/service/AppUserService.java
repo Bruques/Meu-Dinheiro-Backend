@@ -3,6 +3,8 @@ package com.brunomarques.meudinheiro.service;
 import com.brunomarques.meudinheiro.model.AppUser;
 import com.brunomarques.meudinheiro.repository.AppUserRepository;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 import java.util.Random;
 
 @Service
@@ -20,6 +22,14 @@ public class AppUserService {
         AppUser user = userRepository.findById(firebaseUid).orElse(new AppUser());
         user.setFirebaseUid(firebaseUid);
         user.setEmail(email);
+
+        // 👇 SE FOR UM USUÁRIO NOVO, DÁ AS CATEGORIAS PADRÕES
+        if (user.getCustomCategories().isEmpty()) {
+            user.setCustomCategories(List.of(
+                    "Alimentação", "Transporte", "Moradia", "Saúde",
+                    "Lazer", "Educação", "Vestuário", "Outros"
+            ));
+        }
 
         // Gera um código aleatório de 6 dígitos
         String codigo = String.format("%06d", new Random().nextInt(999999));

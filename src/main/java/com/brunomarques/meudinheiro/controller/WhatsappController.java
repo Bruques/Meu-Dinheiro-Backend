@@ -120,7 +120,8 @@ public class WhatsappController {
                 System.out.println("📱 Mensagem TEXTO de: " + numeroCliente);
 
                 try {
-                    List<ExpenseDto> dtos = meuDinheiroService.processExpenseText(textoDoCliente);
+                    AppUser user = appUserRepository.findById(firebaseUid).get();
+                    List<ExpenseDto> dtos = meuDinheiroService.processExpenseText(textoDoCliente, user.getCustomCategories());
                     List<Expense> despesasParaSalvar = new ArrayList<>();
                     StringBuilder mensagemResposta = new StringBuilder("✅ *Gasto Registrado!*\n\n");
 

@@ -3,6 +3,9 @@ package com.brunomarques.meudinheiro.model;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Data
 @Table(name = "app_users") // Evitamos o nome "user" pois é palavra reservada em alguns bancos
@@ -22,5 +25,10 @@ public class AppUser {
     // Campos temporários para fazer o vínculo com segurança
     @Column(name = "verification_code")
     private String verificationCode;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_categories", joinColumns = @JoinColumn(name = "firebase_uid"))
+    @Column(name = "category_name")
+    private List<String> customCategories = new ArrayList<>();
 
 }

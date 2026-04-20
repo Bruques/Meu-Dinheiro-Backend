@@ -32,13 +32,16 @@ public class MeuDinheiroService {
     }
 
 
-    public List<ExpenseDto> processExpenseText(String text) throws Exception {
+    public List<ExpenseDto> processExpenseText(String text, List<String> categoriasDoUsuario) throws Exception {
         String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=" + apiKey;
 
         String dataHoje = LocalDate.now().toString();
         int anoAtual = LocalDate.now().getYear();
 
-        // 1. PROMPT ATUALIZADO: Pedindo um Array
+        // Transforma a lista de Java ["A", "B"] numa String formatada "A, B"
+        String categoriasFormatadas = String.join(", ", categoriasDoUsuario);
+
+        // 1. PROMPT ATUALIZADO: Com a trava de categorias
         String prompt = "Extraia os dados financeiros da frase abaixo. " +
                 "Retorne SEMPRE um ARRAY de objetos JSON (lista). " +
                 "Se houver apenas um gasto, retorne um array com um único objeto. " +
@@ -47,21 +50,21 @@ public class MeuDinheiroService {
                 "Regras para cada objeto: " +
                 "name: Nome curto da despesa. " +
                 "value: Apenas número (ex: 50.00). " +
-                "category: Categoria. " +
+                "category: VOCÊ ESTÁ PROIBIDO de inventar categorias. Classifique o gasto escolhendo EXATAMENTE UMA destas opções: [" + categoriasFormatadas + "]. Se não se encaixar em nenhuma, escolha a mais próxima ou 'Outros'. " +
                 "date: Data yyyy-MM-dd. " +
                 "paymentType: Crédito, Débito, Pix, Cartão Benefício ou null. " +
                 "Frase: " + text;
 
         String requestBody = """
-            {
-              "contents": [{
-                "parts":[{"text": "%s"}]
-              }],
-              "generationConfig": {
-                "response_mime_type": "application/json"
-              }
-            }
-            """.formatted(prompt);
+        {
+          "contents": [{
+            "parts":[{"text": "%s"}]
+          }],
+          "generationConfig": {
+            "response_mime_type": "application/json"
+          }
+        }
+        """.formatted(prompt);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -74,7 +77,7 @@ public class MeuDinheiroService {
                 .path("content").path("parts").get(0)
                 .path("text").asText();
 
-        // 2. LENDO A LISTA: Agora o Jackson vai converter o JSON direto para um List<ExpenseDto>
+        // 2. LENDO A LISTA: Converte o JSON direto para um List<ExpenseDto>
         return objectMapper.readValue(aiJsonResponse, new TypeReference<List<ExpenseDto>>() {});
     }
 
