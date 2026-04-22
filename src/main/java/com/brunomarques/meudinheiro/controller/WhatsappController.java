@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -133,8 +134,10 @@ public class WhatsappController {
                         newExpense.setPaymentType(dto.paymentType());
                         newExpense.setDate(dto.date());
 
-                        // 👉 AQUI ESTÁ A CORREÇÃO DO FLUXO DE CAIXA!
-                        java.time.LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType());
+                        Integer fechamento = usuarioLogado.getDiaFechamentoFatura() != null ? usuarioLogado.getDiaFechamentoFatura() : 21;
+                        Integer vencimento = usuarioLogado.getDiaVencimentoFatura() != null ? usuarioLogado.getDiaVencimentoFatura() : 24;
+
+                        LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType(), fechamento, vencimento);
                         newExpense.setDataCobranca(cobranca);
 
                         // Salvando o UID do Firebase
@@ -175,8 +178,10 @@ public class WhatsappController {
                                 newExpense.setPaymentType(dto.paymentType());
                                 newExpense.setDate(dto.date());
 
-                                // 👉 AQUI ESTÁ A CORREÇÃO DO FLUXO DE CAIXA!
-                                java.time.LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType());
+                                Integer fechamento = usuarioLogado.getDiaFechamentoFatura() != null ? usuarioLogado.getDiaFechamentoFatura() : 21;
+                                Integer vencimento = usuarioLogado.getDiaVencimentoFatura() != null ? usuarioLogado.getDiaVencimentoFatura() : 24;
+
+                                LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType(), fechamento, vencimento);
                                 newExpense.setDataCobranca(cobranca);
 
                                 // Salvando o UID do Firebase

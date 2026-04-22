@@ -31,4 +31,10 @@ public class AppUser {
     @Column(name = "category_name")
     private List<String> customCategories = new ArrayList<>();
 
+    @Column(name = "dia_fechamento_fatura")
+    private Integer diaFechamentoFatura = 10;
+
+    @Column(name = "dia_vencimento_fatura")
+    private Integer diaVencimentoFatura = 17;
+
 }

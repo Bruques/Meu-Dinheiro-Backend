@@ -54,4 +54,18 @@ public class AppUserService {
                 .map(user -> user.getWhatsappNumber() != null)
                 .orElse(false);
     }
+
+    public void atualizarFatura(String firebaseUid, Integer novoFechamento, Integer novoVencimento) {
+        userRepository.findById(firebaseUid).ifPresent(user -> {
+            user.setDiaFechamentoFatura(novoFechamento);
+            user.setDiaVencimentoFatura(novoVencimento);
+            userRepository.save(user);
+        });
+    }
+
+    public Integer buscarDiaFechamento(String firebaseUid) {
+        return userRepository.findById(firebaseUid)
+                .map(AppUser::getDiaFechamentoFatura)
+                .orElse(10);
+    }
 }

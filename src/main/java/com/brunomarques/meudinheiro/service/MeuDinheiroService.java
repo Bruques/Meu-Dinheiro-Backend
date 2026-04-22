@@ -81,21 +81,20 @@ public class MeuDinheiroService {
         return objectMapper.readValue(aiJsonResponse, new TypeReference<List<ExpenseDto>>() {});
     }
 
-    public LocalDate calcularFluxoDeCaixa(LocalDate dataCompra, String tipoPagamento) {
-        int diaFechamento = 21;
-        int diaVencimento = 24;
+    // Recebe os dois dias do usuário
+    public LocalDate calcularFluxoDeCaixa(LocalDate dataCompra, String tipoPagamento, Integer diaFechamento, Integer diaVencimento) {
 
-        // Se for nulo ou não for crédito, sai na mesma hora
         if (tipoPagamento == null || !tipoPagamento.trim().equalsIgnoreCase("Crédito")) {
             return dataCompra;
         }
 
-        // LÓGICA DO CARTÃO DE CRÉDITO
         int diaDaCompra = dataCompra.getDayOfMonth();
 
         if (diaDaCompra <= diaFechamento) {
+            // Cai na fatura deste mês
             return dataCompra.withDayOfMonth(diaVencimento);
         } else {
+            // Cai na fatura do mês que vem
             return dataCompra.plusMonths(1).withDayOfMonth(diaVencimento);
         }
     }

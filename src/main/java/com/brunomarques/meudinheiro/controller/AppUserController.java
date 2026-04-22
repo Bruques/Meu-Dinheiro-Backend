@@ -24,4 +24,17 @@ public class AppUserController {
     public boolean verificarWhatsapp(@PathVariable String uid) {
         return userService.usuarioTemWhatsapp(uid);
     }
+
+    @PostMapping("/atualizar-fatura")
+    public void atualizarFatura(
+            @RequestParam String uid,
+            @RequestParam Integer fechamento,
+            @RequestParam Integer vencimento) {
+        userService.atualizarFatura(uid, fechamento, vencimento);
+    }
+
+    @GetMapping("/dia-fechamento/{uid}")
+    public Integer getDiaFechamento(@PathVariable String uid) {
+        return userService.buscarDiaFechamento(uid);
+    }
 }

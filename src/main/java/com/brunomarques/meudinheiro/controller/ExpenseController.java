@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +21,7 @@ import java.util.Map;
 public class ExpenseController {
 
     @Autowired
-    private MeuDinheiroService aiExpenseService;
+    private MeuDinheiroService meuDinheiroService;
 
     @Autowired
     private MeuDinheiroRepository expenseRepository;
@@ -44,7 +45,7 @@ public class ExpenseController {
             }
 
             // 2. Passa a lista pro Gemini trabalhar engessado
-            List<ExpenseDto> dtos = aiExpenseService.processExpenseText(userText, categoriasDoUsuario);
+            List<ExpenseDto> dtos = meuDinheiroService.processExpenseText(userText, categoriasDoUsuario);
 
             List<Expense> despesasParaSalvar = new ArrayList<>();
 
@@ -58,7 +59,10 @@ public class ExpenseController {
                 newExpense.setDate(dto.date());
                 newExpense.setUserId(userId);
 
-                java.time.LocalDate cobranca = aiExpenseService.calcularFluxoDeCaixa(dto.date(), dto.paymentType());
+                Integer fechamento = usuarioLogado.getDiaFechamentoFatura() != null ? usuarioLogado.getDiaFechamentoFatura() : 21;
+                Integer vencimento = usuarioLogado.getDiaVencimentoFatura() != null ? usuarioLogado.getDiaVencimentoFatura() : 24;
+
+                LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType(), fechamento, vencimento);
                 newExpense.setDataCobranca(cobranca);
 
                 despesasParaSalvar.add(newExpense);
@@ -110,6 +114,9 @@ public class ExpenseController {
         Expense expense = expenseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Gasto não encontrado"));
 
+        String userId = jwt.getSubject();
+        AppUser usuarioLogado = appUserRepository.findById(userId).orElse(new AppUser());
+
         // Segurança extra: verifica se é o dono
         if (!expense.getUserId().equals(jwt.getSubject())) {
             throw new RuntimeException("Acesso negado");
@@ -121,7 +128,10 @@ public class ExpenseController {
         expense.setDate(dto.date());
         expense.setPaymentType(dto.paymentType());
 
-        java.time.LocalDate novaCobranca = aiExpenseService.calcularFluxoDeCaixa(dto.date(), dto.paymentType());
+        Integer fechamento = usuarioLogado.getDiaFechamentoFatura() != null ? usuarioLogado.getDiaFechamentoFatura() : 21;
+        Integer vencimento = usuarioLogado.getDiaVencimentoFatura() != null ? usuarioLogado.getDiaVencimentoFatura() : 24;
+
+        LocalDate novaCobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType(), fechamento, vencimento);
         expense.setDataCobranca(novaCobranca);
 
         return expenseRepository.save(expense);
