@@ -51,6 +51,7 @@ public class AppUserController {
     @PostMapping("/sync")
     public ResponseEntity<Void> syncUser(@AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
         String firebaseUid = jwt.getSubject();
+        String email = jwt.getClaimAsString("email");
 
         // Verifica se o usuário já existe no banco
         Optional<AppUser> userOpt = appUserRepository.findById(firebaseUid);
@@ -60,6 +61,7 @@ public class AppUserController {
             AppUser newUser = new AppUser();
             newUser.setFirebaseUid(firebaseUid);
 
+            newUser.setEmail(email);
             // Default values
             newUser.setCustomCategories(List.of("Alimentação", "Transporte", "Moradia", "Saúde", "Lazer", "Educação", "Vestuário", "Outros"));
             newUser.setDiaFechamentoFatura(21);
