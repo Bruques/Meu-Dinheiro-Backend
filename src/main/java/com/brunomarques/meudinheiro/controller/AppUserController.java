@@ -70,6 +70,21 @@ public class AppUserController {
             appUserRepository.save(newUser);
         }
 
-        return org.springframework.http.ResponseEntity.ok().build();
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/config")
+    public ResponseEntity<java.util.Map<String, Integer>> getConfiguracoes(@AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
+        String firebaseUid = jwt.getSubject();
+
+        // Busca o usuário no banco
+        AppUser user = appUserRepository.findById(firebaseUid).orElse(new AppUser());
+
+        // Cria um "pacotinho" com as configurações para mandar pro Angular
+        java.util.Map<String, Integer> configs = new java.util.HashMap<>();
+        configs.put("fechamento", user.getDiaFechamentoFatura() != null ? user.getDiaFechamentoFatura() : 21);
+        configs.put("vencimento", user.getDiaVencimentoFatura() != null ? user.getDiaVencimentoFatura() : 24);
+
+        return ResponseEntity.ok(configs);
     }
 }
