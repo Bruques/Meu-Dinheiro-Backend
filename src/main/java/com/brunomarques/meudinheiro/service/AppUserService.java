@@ -68,4 +68,12 @@ public class AppUserService {
                 .map(AppUser::getDiaFechamentoFatura)
                 .orElse(10);
     }
+
+    public List<String> buscarCategorias(String firebaseUid) {
+        return userRepository.findById(firebaseUid)
+                .map(AppUser::getCustomCategories)
+                // Se por acaso não achar o usuário, devolve um fallback para a tela não quebrar
+                .orElse(List.of("Alimentação", "Transporte", "Moradia", "Saúde",
+                        "Lazer", "Educação", "Vestuário", "Outros"));
+    }
 }

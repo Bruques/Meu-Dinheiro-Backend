@@ -87,4 +87,10 @@ public class AppUserController {
 
         return ResponseEntity.ok(configs);
     }
+
+    @GetMapping("/{firebaseUid}/categorias")
+    public ResponseEntity<List<String>> getCategoriasDoUsuario(@PathVariable String firebaseUid) {
+        List<String> categorias = userService.buscarCategorias(firebaseUid);
+        return ResponseEntity.ok(categorias);
+    }
 }

@@ -52,7 +52,7 @@ public class ExpenseController {
             // Faz um loop criando uma Entidade para cada DTO encontrado
             for (ExpenseDto dto : dtos) {
                 Expense newExpense = new Expense();
-                newExpense.setName(dto.name());
+                newExpense.setName(formatarNome(dto.name()));
                 newExpense.setValue(dto.value());
                 newExpense.setCategory(dto.category());
                 newExpense.setPaymentType(dto.paymentType());
@@ -122,7 +122,7 @@ public class ExpenseController {
             throw new RuntimeException("Acesso negado");
         }
 
-        expense.setName(dto.name());
+        expense.setName(formatarNome(dto.name()));
         expense.setValue(dto.value());
         expense.setCategory(dto.category());
         expense.setDate(dto.date());
@@ -135,5 +135,13 @@ public class ExpenseController {
         expense.setDataCobranca(novaCobranca);
 
         return expenseRepository.save(expense);
+    }
+
+    private String formatarNome(String nome) {
+        if (nome == null || nome.isEmpty()) {
+            return nome;
+        }
+        // Deixa a primeira letra maiúscula e o resto como está (ou tudo minusculo se preferir)
+        return nome.substring(0, 1).toUpperCase() + nome.substring(1).toLowerCase();
     }
 }
