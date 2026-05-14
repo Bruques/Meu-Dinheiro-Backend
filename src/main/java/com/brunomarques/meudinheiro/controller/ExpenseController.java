@@ -47,6 +47,8 @@ public class ExpenseController {
             // 2. Passa a lista pro Gemini trabalhar engessado
             List<ExpenseDto> dtos = meuDinheiroService.processExpenseText(userText, categoriasDoUsuario);
 
+            System.out.println("=== RETORNO DO GEMINI: " + dtos + " ===");
+
             List<Expense> despesasParaSalvar = new ArrayList<>();
 
             // Faz um loop criando uma Entidade para cada DTO encontrado
@@ -73,7 +75,32 @@ public class ExpenseController {
 
         } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Erro ao processar e salvar os gastos em lote");
+            throw new RuntimeException("Erro Real: " + e.getClass().getSimpleName() + " - " + e.getMessage(), e);        }
+    }
+
+    @PostMapping
+    public Expense saveManualExpense(@RequestBody Expense novaDespesa, @AuthenticationPrincipal Jwt jwt) {
+        try {
+            String userId = jwt.getSubject();
+            novaDespesa.setUserId(userId);
+
+            AppUser usuarioLogado = appUserRepository.findById(userId).orElse(new AppUser());
+            Integer fechamento = usuarioLogado.getDiaFechamentoFatura() != null ? usuarioLogado.getDiaFechamentoFatura() : 21;
+            Integer vencimento = usuarioLogado.getDiaVencimentoFatura() != null ? usuarioLogado.getDiaVencimentoFatura() : 24;
+
+            LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(
+                    novaDespesa.getDate(),
+                    novaDespesa.getPaymentType(),
+                    fechamento,
+                    vencimento
+            );
+            novaDespesa.setDataCobranca(cobranca);
+
+            return expenseRepository.save(novaDespesa);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao salvar despesa manual: " + e.getMessage(), e);
         }
     }
 
