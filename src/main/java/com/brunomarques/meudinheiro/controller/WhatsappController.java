@@ -8,12 +8,16 @@ import com.brunomarques.meudinheiro.repository.MeuDinheiroRepository;
 import com.brunomarques.meudinheiro.service.AppUserService;
 import com.brunomarques.meudinheiro.service.MeuDinheiroService;
 import com.brunomarques.meudinheiro.service.WhatsappService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,8 +33,12 @@ public class WhatsappController {
     private final AppUserService appUserService;
     private final AppUserRepository appUserRepository;
 
-    // Invente uma senha forte aqui. Você vai precisar dela no painel da Meta.
-    private final String VERIFY_TOKEN = "meu_token_secreto_123";
+    // A Chave Secreta do App (Pegue no Painel da Meta > Configurações > Básico)
+    @Value("${whatsapp.app.secret}")
+    private String APP_SECRET;
+
+    @Value("${whatsapp.verify.token}")
+    private String VERIFY_TOKEN;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -52,7 +60,6 @@ public class WhatsappController {
             @RequestParam("hub.verify_token") String token,
             @RequestParam("hub.challenge") String challenge) {
 
-        // A Meta envia um GET para testar se o seu servidor responde corretamente
         if ("subscribe".equals(mode) && VERIFY_TOKEN.equals(token)) {
             System.out.println("✅ Webhook validado com sucesso!");
             return ResponseEntity.ok(challenge);
@@ -62,39 +69,40 @@ public class WhatsappController {
     }
 
     @PostMapping("/webhook")
-    public ResponseEntity<Void> handleMessage(@RequestBody String payload) {
+    public ResponseEntity<Void> handleMessage(
+            @RequestHeader(value = "X-Hub-Signature-256", required = false) String signatureHeader,
+            @RequestBody String payload) {
+
+        if (signatureHeader == null || !isValidSignature(payload, signatureHeader)) {
+            System.out.println("🚨 TENTATIVA DE ATAQUE BLOQUEADA: Assinatura inválida ou ausente!");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build(); // Barra o hacker aqui!
+        }
+
         try {
             JsonNode rootNode = objectMapper.readTree(payload);
 
-            // 1. FILTRO DA META: Ignora o que não for mensagem de usuário
             if (!rootNode.has("object") || !rootNode.get("object").asText().equals("whatsapp_business_account")) {
                 return ResponseEntity.ok().build();
             }
 
             JsonNode value = rootNode.path("entry").get(0).path("changes").get(0).path("value");
             if (!value.has("messages")) {
-                return ResponseEntity.ok().build(); // É só um recibo de leitura, ignora.
+                return ResponseEntity.ok().build();
             }
 
             JsonNode messageNode = value.path("messages").get(0);
             String numeroCliente = messageNode.path("from").asText();
             String tipoMensagem = messageNode.path("type").asText();
 
-            // Extrai o texto antecipadamente se for uma mensagem de texto
             String textoDoCliente = "";
             if ("text".equals(tipoMensagem)) {
                 textoDoCliente = messageNode.path("text").path("body").asText().trim();
             }
 
-            // ====================================================================================
-            // 2. O SEGURANÇA (NOVO FLUXO DE IDENTIDADE E FIREBASE)
-            // ====================================================================================
             Optional<AppUser> usuarioOpt = appUserRepository.findByWhatsappNumber(numeroCliente);
 
             if (usuarioOpt.isEmpty()) {
-                // USUÁRIO DESCONHECIDO! Vamos checar se ele está tentando se vincular
                 if ("text".equals(tipoMensagem) && textoDoCliente.matches("\\d{6}")) {
-                    // Ele mandou 6 números exatos. Tenta validar o código!
                     boolean sucesso = appUserService.confirmarVinculo(numeroCliente, textoDoCliente);
                     if (sucesso) {
                         whatsAppService.enviarMensagem(numeroCliente, "✅ *Conta vinculada com sucesso!* \nAgora os gastos que você enviar aqui vão direto para o seu painel.");
@@ -102,11 +110,8 @@ public class WhatsappController {
                         whatsAppService.enviarMensagem(numeroCliente, "❌ Código inválido ou expirado. Gere um novo no seu painel web.");
                     }
                 } else {
-                    // Não é código e não tá cadastrado
                     whatsAppService.enviarMensagem(numeroCliente, "🤖 Olá! Vi que seu número ainda não está vinculado.\n\nAcesse o site Meu Dinheiro, vá em 'Perfil', gere um código de 6 dígitos e digite ele aqui no chat para liberar o acesso.");
                 }
-
-                // Encerra a requisição AQUI. Não chama a IA se não tiver conta!
                 return ResponseEntity.ok().build();
             }
 
@@ -140,7 +145,6 @@ public class WhatsappController {
                         LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType(), fechamento, vencimento);
                         newExpense.setDataCobranca(cobranca);
 
-                        // Salvando o UID do Firebase
                         newExpense.setUserId(firebaseUid);
                         despesasParaSalvar.add(newExpense);
 
@@ -184,7 +188,6 @@ public class WhatsappController {
                                 LocalDate cobranca = meuDinheiroService.calcularFluxoDeCaixa(dto.date(), dto.paymentType(), fechamento, vencimento);
                                 newExpense.setDataCobranca(cobranca);
 
-                                // Salvando o UID do Firebase
                                 newExpense.setUserId(firebaseUid);
                                 despesasParaSalvar.add(newExpense);
 
@@ -207,6 +210,34 @@ public class WhatsappController {
         } catch (Exception e) {
             System.err.println("Erro crítico no webhook: " + e.getMessage());
             return ResponseEntity.ok().build();
+        }
+    }
+
+    private boolean isValidSignature(String payload, String signatureHeader) {
+        try {
+            String[] parts = signatureHeader.split("=");
+            if (parts.length != 2) return false;
+            String expectedHash = parts[1];
+
+            Mac mac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(
+                    APP_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            mac.init(secretKeySpec);
+
+            byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+
+            return expectedHash.equals(hexString.toString());
+
+        } catch (Exception e) {
+            System.out.println("Erro ao validar criptografia: " + e.getMessage());
+            return false;
         }
     }
 }
