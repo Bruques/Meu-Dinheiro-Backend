@@ -26,6 +26,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // LIBERAÇÃO WHATSAPP: Permite que a Meta acesse o webhook sem token
                         .requestMatchers("/api/whatsapp/**").permitAll()
+                        .requestMatchers("/api/expenses/ping").permitAll()
 
                         // O RESTO CONTINUA BLOQUEADO: Exige autenticação para todo o resto
                         .anyRequest().authenticated()

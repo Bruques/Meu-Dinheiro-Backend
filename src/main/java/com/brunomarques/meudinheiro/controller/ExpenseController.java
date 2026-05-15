@@ -168,7 +168,17 @@ public class ExpenseController {
         if (nome == null || nome.isEmpty()) {
             return nome;
         }
-        // Deixa a primeira letra maiúscula e o resto como está (ou tudo minusculo se preferir)
         return nome.substring(0, 1).toUpperCase() + nome.substring(1).toLowerCase();
+    }
+
+    // I do that to keep the backend on render.com online event when I'm not using it.
+    @GetMapping("/ping")
+    public String ping() {
+        try {
+            expenseRepository.count();
+            return "Sistemas Online - Render e Neon acordados! 🚀";
+        } catch (Exception e) {
+            return "Backend acordou, mas o Banco deu erro: " + e.getMessage();
+        }
     }
 }
