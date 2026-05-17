@@ -7,6 +7,7 @@ import com.brunomarques.meudinheiro.repository.AppUserRepository;
 import com.brunomarques.meudinheiro.repository.MeuDinheiroRepository;
 import com.brunomarques.meudinheiro.service.AppUserService;
 import com.brunomarques.meudinheiro.service.MeuDinheiroService;
+import com.brunomarques.meudinheiro.service.RateLimiterService;
 import com.brunomarques.meudinheiro.service.WhatsappService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,7 @@ public class WhatsappController {
     private final WhatsappService whatsAppService;
     private final MeuDinheiroService meuDinheiroService;
     private final MeuDinheiroRepository meuDinheiroRepository;
+    private final RateLimiterService rateLimiterService;
 
     private final AppUserService appUserService;
     private final AppUserRepository appUserRepository;
@@ -46,12 +48,14 @@ public class WhatsappController {
                               MeuDinheiroService meuDinheiroService,
                               MeuDinheiroRepository meuDinheiroRepository,
                               AppUserService appUserService,
-                              AppUserRepository appUserRepository) {
+                              AppUserRepository appUserRepository,
+                              RateLimiterService rateLimiterService) {
         this.whatsAppService = whatsAppService;
         this.meuDinheiroService = meuDinheiroService;
         this.meuDinheiroRepository = meuDinheiroRepository;
         this.appUserService = appUserService;
         this.appUserRepository = appUserRepository;
+        this.rateLimiterService = rateLimiterService;
     }
 
     @GetMapping("/webhook")
@@ -68,6 +72,7 @@ public class WhatsappController {
         }
     }
 
+    // TODO: - Limpar e separar responsabilidades nesse metodo.
     @PostMapping("/webhook")
     public ResponseEntity<Void> handleMessage(
             @RequestHeader(value = "X-Hub-Signature-256", required = false) String signatureHeader,
@@ -119,11 +124,23 @@ public class WhatsappController {
             AppUser usuarioLogado = usuarioOpt.get();
             String firebaseUid = usuarioLogado.getFirebaseUid();
 
+            if (!rateLimiterService.tryConsumeAi(numeroCliente)) {
+                System.out.println("⚠️ Rate limit atingido para o número: " + numeroCliente);
+                whatsAppService.enviarMensagem(numeroCliente, "⚠️ *Calma lá!* Você está enviando mensagens rápido demais. Aguarde um minuto para processar novos gastos.");
+                return ResponseEntity.ok().build();
+            }
+
             // ====================================================================================
             // 3. O ATENDIMENTO (PROCESSA GASTOS EM TEXTO OU ÁUDIO)
             // ====================================================================================
             if ("text".equals(tipoMensagem)) {
                 System.out.println("📱 Mensagem TEXTO de: " + numeroCliente);
+
+                // TODO: - Testar se 250 caracteres nao e pouco
+                if (textoDoCliente.length() > 250) {
+                    whatsAppService.enviarMensagem(numeroCliente, "⚠️ *Uau, que lista gigante!* \nPor favor, mande no máximo uns 5 gastos por vez para eu conseguir organizar direitinho sem sobrecarregar a memória.");
+                    return ResponseEntity.ok().build(); // Encerra sem chamar a IA
+                }
 
                 try {
                     AppUser user = appUserRepository.findById(firebaseUid).get();

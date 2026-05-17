@@ -6,7 +6,11 @@ import com.brunomarques.meudinheiro.model.Expense;
 import com.brunomarques.meudinheiro.repository.AppUserRepository;
 import com.brunomarques.meudinheiro.repository.MeuDinheiroRepository;
 import com.brunomarques.meudinheiro.service.MeuDinheiroService;
+import com.brunomarques.meudinheiro.service.RateLimiterService;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +28,9 @@ public class ExpenseController {
     private MeuDinheiroService meuDinheiroService;
 
     @Autowired
+    private RateLimiterService rateLimiterService;
+
+    @Autowired
     private MeuDinheiroRepository expenseRepository;
 
     @Autowired
@@ -34,6 +41,17 @@ public class ExpenseController {
         try {
             String userText = payload.get("text");
             String userId = jwt.getSubject();
+
+            if (!rateLimiterService.tryConsumeAi(userId)) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "Muitas requisições de IA! Por favor, aguarde um minuto antes de extrair novos textos.");
+            }
+
+            // TODO: - Testar se 250 caracteres nao e pouco
+            if (userText != null && userText.length() > 250) {
+                throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
+                        "O texto é muito longo! Por favor, envie listas menores (máximo 500 caracteres).");
+            }
 
             // 1. Busca o usuário no banco para pegar as categorias dele
             AppUser usuarioLogado = appUserRepository.findById(userId).orElse(new AppUser());
@@ -82,6 +100,11 @@ public class ExpenseController {
     public Expense saveManualExpense(@RequestBody Expense novaDespesa, @AuthenticationPrincipal Jwt jwt) {
         try {
             String userId = jwt.getSubject();
+            if (!rateLimiterService.tryConsumeManual(userId)) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "Calma lá! Você está adicionando despesas muito rápido. Aguarde um momento.");
+            }
+
             novaDespesa.setUserId(userId);
 
             AppUser usuarioLogado = appUserRepository.findById(userId).orElse(new AppUser());
