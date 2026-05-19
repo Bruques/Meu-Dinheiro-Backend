@@ -20,8 +20,12 @@ public class WhatsappService {
     @Value("${whatsapp.api.token}")
     private String token;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public WhatsappService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     public void enviarMensagem(String numeroDestino, String texto) {
         String url = "https://graph.facebook.com/v20.0/" + phoneId + "/messages";

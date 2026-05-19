@@ -24,10 +24,11 @@ public class MeuDinheiroService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public MeuDinheiroService() {
+    public MeuDinheiroService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
         this.objectMapper.registerModule(new JavaTimeModule());
     }
 
