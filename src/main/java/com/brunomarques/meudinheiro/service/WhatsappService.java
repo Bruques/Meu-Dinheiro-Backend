@@ -1,5 +1,7 @@
 package com.brunomarques.meudinheiro.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -11,8 +13,13 @@ import org.springframework.http.ResponseEntity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @Service
 public class WhatsappService {
+
+    private static final Logger log = LoggerFactory.getLogger(WhatsappService.class);
 
     @Value("${whatsapp.api.phone-id}")
     private String phoneId;
@@ -30,33 +37,26 @@ public class WhatsappService {
     public void enviarMensagem(String numeroDestino, String texto) {
         String url = "https://graph.facebook.com/v20.0/" + phoneId + "/messages";
 
-        // 1. Criamos o corpo usando um Map ou String bem limpa
-        // Certifique-se de que não há espaços extras ou quebras de linha estranhas
-        String jsonPayload = """
-            {
-              "messaging_product": "whatsapp",
-              "recipient_type": "individual",
-              "to": "%s",
-              "type": "text",
-              "text": { "body": "%s" }
-            }
-            """.formatted(numeroDestino, texto.replace("\n", "\\n")); // Escapa quebras de linha
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("messaging_product", "whatsapp");
+        body.put("recipient_type", "individual");
+        body.put("to", numeroDestino);
+        body.put("type", "text");
+        body.put("text", Map.of("body", texto));
 
-        // 2. Cabeçalhos explícitos
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(token);
 
-        HttpEntity<String> entity = new HttpEntity<>(jsonPayload, headers);
-
         try {
-            // Log de depuração para ver o que REALMENTE está saindo
-            System.out.println("🚀 Enviando JSON para Meta: " + jsonPayload);
+            String jsonPayload = objectMapper.writeValueAsString(body);
+            HttpEntity<String> entity = new HttpEntity<>(jsonPayload, headers);
 
+            log.debug("Enviando mensagem para Meta: {}", jsonPayload);
             restTemplate.postForObject(url, entity, String.class);
-            System.out.println("✅ Mensagem entregue ao WhatsApp!");
+            log.info("Mensagem entregue ao WhatsApp para {}", numeroDestino);
         } catch (Exception e) {
-            System.err.println("❌ Erro ao enviar mensagem: " + e.getMessage());
+            log.error("Erro ao enviar mensagem via WhatsApp para {}", numeroDestino, e);
         }
     }
 
@@ -76,10 +76,10 @@ public class WhatsappService {
             JsonNode root = objectMapper.readTree(response.getBody());
             String urlDownload = root.path("url").asText();
 
-            System.out.println("🔗 URL de download encontrada: " + urlDownload);
+            log.debug("URL de download encontrada para mídia {}", mediaId);
             return urlDownload;
         } catch (Exception e) {
-            System.err.println("❌ Erro ao processar JSON da mídia: " + e.getMessage());
+            log.error("Erro ao processar JSON da mídia {}", mediaId, e);
             return null;
         }
     }
@@ -94,10 +94,10 @@ public class WhatsappService {
 
         try {
             ResponseEntity<byte[]> response = restTemplate.exchange(mediaUrl, HttpMethod.GET, entity, byte[].class);
-            System.out.println("✅ Áudio baixado com sucesso! Tamanho: " + response.getBody().length + " bytes");
+            log.debug("Áudio baixado com sucesso, {} bytes", response.getBody().length);
             return response.getBody();
         } catch (Exception e) {
-            System.err.println("❌ Erro ao baixar o arquivo físico: " + e.getMessage());
+            log.error("Erro ao baixar arquivo de mídia", e);
             return null;
         }
     }
